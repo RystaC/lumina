@@ -1,0 +1,247 @@
+#pragma once
+
+#include <format>
+#include <optional>
+#include <ostream>
+
+#include <cmath>
+
+#include "base.hpp"
+#include "rng.hpp"
+
+namespace lumina {
+
+template<typename T>
+union vec3 {
+private:
+    T arr_[3];
+public:
+    struct {
+        T x;
+        T y;
+        T z;
+    };
+    struct {
+        T r;
+        T g;
+        T b;
+    };
+    struct {
+        T u;
+        T v;
+        T w;
+    };
+
+    constexpr vec3() noexcept : arr_{0, 0, 0} {}
+    constexpr vec3(T v) noexcept : arr_{v, v, v} {}
+    constexpr vec3(T x, T y, T z) noexcept : arr_{x, y, z} {}
+
+    // subscription
+    constexpr const T& operator[](size_t i) const& noexcept { return arr_[i]; }
+    constexpr T& operator[](size_t i) & noexcept { return arr_[i]; }
+    constexpr T operator[](size_t i) const&& noexcept { return arr_[i]; }
+
+    // unary operations
+    constexpr vec3<T> operator+() const noexcept { return { arr_[0],  arr_[1],  arr_[2]}; }
+    constexpr vec3<T> operator-() const noexcept { return {-arr_[0], -arr_[1], -arr_[2]}; }
+
+    // compound operations
+    constexpr vec3<T>& operator+=(const vec3<T>& v) noexcept {
+        arr_[0] += v.arr_[0];
+        arr_[1] += v.arr_[1];
+        arr_[2] += v.arr_[2];
+        return *this;
+    }
+    constexpr vec3<T>& operator-=(const vec3<T>& v) noexcept {
+        arr_[0] -= v.arr_[0];
+        arr_[1] -= v.arr_[1];
+        arr_[2] -= v.arr_[2];
+        return *this;
+    }
+    constexpr vec3<T>& operator*=(T s) noexcept {
+        arr_[0] *= s;
+        arr_[1] *= s;
+        arr_[2] *= s;
+        return *this;
+    }
+    constexpr vec3<T>& operator/=(T s) noexcept {
+        arr_[0] /= s;
+        arr_[1] /= s;
+        arr_[2] /= s;
+        return *this;
+    }
+
+    constexpr vec3<T> ew_mul(const vec3<T>& v) const noexcept {
+        return vec3<T>(
+            x * v.x,
+            y * v.y,
+            z * v.z
+        );
+    }
+
+    constexpr vec3<T> ew_div(const vec3<T>& v) const noexcept {
+        return vec3<T>(
+            x / v.x,
+            y / v.y,
+            z / v.z  
+        );
+    }
+
+    // vector specific operations
+    constexpr T dot(const vec3<T>& v) const noexcept {
+        return x * v.x + y * v.y + z * v.z;
+    }
+    constexpr vec3<T> cross(const vec3<T>& v) const noexcept {
+        return vec3<T>(
+            y * v.z - z * v.y,
+            z * v.x - x * v.z,
+            x * v.y - y * v.x
+        );
+    }
+    constexpr T norm() const noexcept {
+        return std::sqrt(dot(*this));
+    }
+};
+
+// binary operations
+template<typename T>
+inline constexpr vec3<T> operator+(const vec3<T>& a, const vec3<T>& b) noexcept {
+    return vec3<T>(a) += b;
+}
+template<typename T>
+inline constexpr vec3<T> operator-(const vec3<T>& a, const vec3<T>& b) noexcept {
+    return vec3<T>(a) -= b;
+}
+template<typename T>
+inline constexpr vec3<T> operator*(const vec3<T>& v, T s) noexcept {
+    return vec3<T>(v) *= s;
+}
+template<typename T>
+inline constexpr vec3<T> operator*(T s, const vec3<T>& v) noexcept {
+    return vec3<T>(v) *= s;
+}
+template<typename T>
+inline constexpr vec3<T> operator/(const vec3<T>& v, T s) noexcept {
+    return vec3<T>(v) /= s;
+}
+
+template<typename T>
+inline constexpr vec3<T> ew_mul(const vec3<T>& a, const vec3<T>& b) noexcept {
+    return vec3<T>(a).ew_mul(b);
+}
+
+template<typename T>
+inline constexpr vec3<T> ew_div(const vec3<T>& a, const vec3<T>& b) noexcept {
+    return vec3<T>(a).ew_div(b);
+}
+
+template<typename T>
+inline constexpr vec3<T> min(const vec3<T>& a, const vec3<T>& b) noexcept {
+    return { std::min(a.x, b.x), std::min(a.y, b.y), std::min(a.z, b.z) };
+}
+
+template<typename T>
+inline constexpr vec3<T> max(const vec3<T>& a, const vec3<T>& b) noexcept {
+    return { std::max(a.x, b.x), std::max(a.y, b.y), std::max(a.z, b.z) };
+}
+
+// vector specific operations
+template<typename T>
+inline constexpr T dot(const vec3<T>& a, const vec3<T>& b) noexcept {
+    return a.dot(b);
+}
+template<typename T>
+inline constexpr vec3<T> cross(const vec3<T>& a, const vec3<T>& b) noexcept {
+    return a.cross(b);
+}
+template<typename T>
+inline constexpr T norm(const vec3<T>& v) noexcept {
+    return v.norm();
+}
+template<typename T>
+inline constexpr vec3<T> normalize(const vec3<T>& v) noexcept {
+    return v / v.norm();
+}
+
+template<typename T>
+inline constexpr T distance(const vec3<T>& a, const vec3<T>& b) noexcept {
+    return (a - b).norm();
+}
+
+template<typename T>
+inline constexpr vec3<T> reflect(const vec3<T>& i, const vec3<T>& n) {
+    return i - 2 * dot(i, n) * n;
+}
+
+template<typename T>
+inline constexpr std::optional<vec3<T>> refract(const vec3<T>& i, const vec3<T>& n, f32 n1, f32 n2) {
+    auto cos_theta1 = dot(-i, n);
+    auto n_ratio = n1 / n2;
+    auto sin_theta2_sq = n_ratio * n_ratio * (1 - cos_theta1 * cos_theta1);
+
+    if(sin_theta2_sq > 1.0f) {
+        return std::nullopt;
+    }
+
+    auto cos_theta2 = std::sqrt(1 - sin_theta2_sq);
+    return n_ratio * i + (n_ratio * cos_theta1 - cos_theta2) * n;
+}
+
+template<typename T>
+inline std::ostream& operator<<(std::ostream& os, const vec3<T>& v) {
+    if constexpr(std::is_floating_point_v<T>) {
+        os << std::format("({:.2f}, {:.2f}, {:.2f})", v.x, v.y, v.z);
+    }
+    else {
+        os << std::format("({}, {}, {})", v.x, v.y, v.z);
+    }
+    return os;
+}
+
+using vec3s8  =  vec3<s8>;
+using vec3s16 = vec3<s16>;
+using vec3s32 = vec3<s32>;
+using vec3s64 = vec3<s64>;
+
+using vec3u8  =  vec3<u8>;
+using vec3u16 = vec3<u16>;
+using vec3u32 = vec3<u32>;
+using vec3u64 = vec3<u64>;
+
+using vec3f32 = vec3<f32>;
+using vec3f64 = vec3<f64>;
+
+// vector n should be normalized
+template<class RandGen>
+inline vec3f32 sample_hemisphere(const vec3f32& n, RandGen& rng) {
+    std::uniform_real_distribution<f32> r{};
+
+    auto phi = 2.0f * F32_PI * r(rng);
+    auto sin_theta_sqrt = r(rng);
+    auto sin_theta = std::sqrt(sin_theta_sqrt);
+
+    vec3f32 axis = std::abs(n.x) > 0.001f ? vec3f32(0.0f, 1.0f, 0.0f) : vec3f32(1.0f, 0.0f, 0.0f);
+    auto t = normalize(cross(axis, n));
+    auto s = cross(n, t);
+
+    return normalize(s * std::cos(phi) * sin_theta + t * std::sin(phi) * sin_theta + n * std::sqrt(1.0f - sin_theta_sqrt));
+}
+
+}
+
+template<typename T>
+struct std::formatter<lumina::vec3<T>> {
+    constexpr auto parse(std::format_parse_context& ctx) {
+        auto iter = ctx.begin();
+        return iter;
+    }
+
+    auto format(const lumina::vec3<T>& v, std::format_context& ctx) const {
+        if constexpr(std::is_floating_point_v<T>) {
+            return std::format_to(ctx.out(), "({:.2f}, {:.2f}, {:.2f})", v.x, v.y, v.z);
+        }
+        else {
+            return std::format_to(ctx.out(), "({}, {}, {})", v.x, v.y, v.z);
+        }
+    }
+};

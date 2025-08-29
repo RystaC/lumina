@@ -1,0 +1,6 @@
+/.vscode
+
+/asset/**
+!/asset/**/
+!/asset/**/.gitkeep
+/build

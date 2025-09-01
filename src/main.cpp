@@ -2,6 +2,7 @@
 #include <fstream>
 #include <format>
 #include <iostream>
+#include <mutex>
 #include <random>
 #include <semaphore>
 #include <thread>
@@ -102,17 +103,6 @@ int main(int argc, const char* argv[]) {
         90.0f, IMAGE_WIDTH, IMAGE_HEIGHT
     );
 
-    // auto first_ray = cam.generate_ray(0, 0);
-    // auto n = lumina::vec3f32(0.0f, 1.0f, 0.0f);
-    // auto roughness = 0.5f;
-    // auto n1 = 1.0f;
-    // auto n2 = 1.5f;
-    // std::cout << std::format("first ray = {}", first_ray) << std::endl;
-    // auto [second_ray, bsdf_value, pdf_value] = lumina::sample_bsdf(first_ray.direction, -first_ray.direction, roughness, n1, n2, rng0);
-    // std::cout << std::format("second ray dir = {}, BSDF value = {}, PDF value = {}", second_ray, bsdf_value, pdf_value) << std::endl;
-
-    // return 0;
-
     auto [vertices, indices, mesh_groups] = lumina::load_obj("../asset/mori_knob/mori_knob.obj");
     std::vector<lumina::u32> mat_indices(indices.size());
     std::vector<lumina::material> materials(mesh_groups.size());
@@ -148,16 +138,34 @@ int main(int argc, const char* argv[]) {
 
     auto thread_count = std::max<lumina::u32>(1, std::thread::hardware_concurrency());
     std::vector<std::thread> threads{};
- 
-    for(auto i = 0; i < thread_count; ++i) {
-        auto split_width = IMAGE_WIDTH / thread_count;
-        threads.push_back(
-            std::thread([&](lumina::u32 tid, std::random_device::result_type seed) {
-                lumina::xoshiro256pp rng(seed);
+    std::queue<std::pair<lumina::u32, lumina::u32>> task_queue{};
+    for(auto y = 0; y < IMAGE_HEIGHT; ++y) {
+        for(auto x = 0; x < IMAGE_WIDTH; ++x) {
+            task_queue.push(std::make_pair(x, y));
+        }
+    }
 
-                for(lumina::u32 y = 0; y < IMAGE_HEIGHT; ++y) {
-                    std::clog << std::format("\rprogress: thread {:>2} > {:>3.1f}% ({:>4}/{:>4})", tid, (float(y) / (IMAGE_HEIGHT - 1)) * 100, y + 1, IMAGE_HEIGHT) << std::flush;
-                    for(lumina::u32 x = tid * split_width; x < std::min((tid + 1) * split_width, IMAGE_WIDTH); ++x) {
+    auto total_pixels = task_queue.size();
+
+    std::mutex queue_lock{};
+
+    for(auto i = 0; i < thread_count; ++i) {
+        threads.push_back(
+            std::thread(
+                [&](std::random_device::result_type seed) {
+                    lumina::xoshiro256pp rng(seed);
+
+                    while(true) {
+                        queue_lock.lock();
+                        if(task_queue.empty()) {
+                            queue_lock.unlock();
+                            break;
+                        }
+                        auto [x, y] = task_queue.front();
+                        task_queue.pop();
+                        std::clog << std::format("\rprogress: {:.2f}% ({:>6}/{:>6})", lumina::f32(total_pixels - task_queue.size()) / lumina::f32(total_pixels) * 100.0f, total_pixels - task_queue.size(), total_pixels) << std::flush;
+                        queue_lock.unlock();
+                        
                         lumina::vec3f32 pixel{};
                         for(lumina::u32 s = 0; s < SAMPLES; ++s) {
                             auto ray = cam.generate_ray(x, y, rng);
@@ -167,8 +175,9 @@ int main(int argc, const char* argv[]) {
                         pixel /= lumina::f32(SAMPLES);
                         pixels[y * IMAGE_WIDTH + x] = pixel;
                     }
-                }
-            }, i, seed())
+                },
+                seed()
+            )
         );
     }
 

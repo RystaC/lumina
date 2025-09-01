@@ -5,7 +5,9 @@
 #include <format>
 #include <fstream>
 #include <iostream>
+#include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 #include "base.hpp"
@@ -44,7 +46,7 @@ inline u32 read_index(std::string_view& str, u32 vertex_count) {
     return v;
 }
 
-inline std::pair<std::vector<vec3f32>, std::vector<vec3u32>> load_obj(const char* path) {
+inline std::tuple<std::vector<vec3f32>, std::vector<vec3u32>, std::unordered_map<std::string, std::pair<u32, u32>>> load_obj(const char* path) {
     std::FILE* fp = std::fopen(path, "r");
     if(!fp) {
         std::clog << std::format("could not read file: {}", path) << std::endl;
@@ -54,10 +56,15 @@ inline std::pair<std::vector<vec3f32>, std::vector<vec3u32>> load_obj(const char
     std::vector<vec3f32> vertices{};
     std::vector<vec3u32> indices{};
 
+    // (start indices index, end indices index + 1)
+    std::unordered_map<std::string, std::pair<u32, u32>> mesh_groups{};
+
     // maximum line length of .obj file
     constexpr u32 BUF_SIZE = 256;
     std::array<char, BUF_SIZE> buf{};
     u32 line{};
+
+    std::string current_group{};
 
     while(!std::feof(fp)) {
         buf.fill('\0');
@@ -141,15 +148,35 @@ inline std::pair<std::vector<vec3f32>, std::vector<vec3u32>> load_obj(const char
                 indices.push_back({i3, i0, i2});
             }
         }
+        // group
+        else if(head == "g") {
+            seek_token(str);
+
+            auto group_name = read_token(str);
+            seek_token(str);
+
+            if(current_group.empty()) {
+                current_group = group_name;
+                mesh_groups[current_group] = std::make_pair(0, 0);
+            }
+            else {
+                mesh_groups[current_group].second = static_cast<u32>(indices.size());
+
+                current_group = group_name;
+                mesh_groups[current_group] = std::make_pair(static_cast<u32>(indices.size()), 0);
+            }
+        }
         // other token -> skip
         else {
             continue;
         }
     }
 
+    mesh_groups[current_group].second = static_cast<u32>(indices.size());
+
     std::fclose(fp);
 
-    return { vertices, indices };
+    return { vertices, indices, mesh_groups };
 }
 
 }

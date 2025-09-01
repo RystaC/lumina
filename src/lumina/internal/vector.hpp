@@ -64,27 +64,25 @@ public:
         arr_[2] *= s;
         return *this;
     }
+    // element-wise multiplication
+    constexpr vec3<T>& operator*=(const vec3<T>& v) noexcept {
+        arr_[0] *= v.arr_[0];
+        arr_[1] *= v.arr_[1];
+        arr_[2] *= v.arr_[2];
+        return *this;
+    }
     constexpr vec3<T>& operator/=(T s) noexcept {
         arr_[0] /= s;
         arr_[1] /= s;
         arr_[2] /= s;
         return *this;
     }
-
-    constexpr vec3<T> ew_mul(const vec3<T>& v) const noexcept {
-        return vec3<T>(
-            x * v.x,
-            y * v.y,
-            z * v.z
-        );
-    }
-
-    constexpr vec3<T> ew_div(const vec3<T>& v) const noexcept {
-        return vec3<T>(
-            x / v.x,
-            y / v.y,
-            z / v.z  
-        );
+    // element-wise division
+    constexpr vec3<T>& operator/=(const vec3<T>& v) noexcept {
+        arr_[0] /= v.arr_[0];
+        arr_[1] /= v.arr_[1];
+        arr_[2] /= v.arr_[2];
+        return *this;
     }
 
     // vector specific operations
@@ -120,19 +118,19 @@ template<typename T>
 inline constexpr vec3<T> operator*(T s, const vec3<T>& v) noexcept {
     return vec3<T>(v) *= s;
 }
+// element-wise multiplication
+template<typename T>
+inline constexpr vec3<T> operator*(const vec3<T>& a, const vec3<T>& b) noexcept {
+    return vec3<T>(a) *= b;
+}
 template<typename T>
 inline constexpr vec3<T> operator/(const vec3<T>& v, T s) noexcept {
     return vec3<T>(v) /= s;
 }
-
+// element-wise division
 template<typename T>
-inline constexpr vec3<T> ew_mul(const vec3<T>& a, const vec3<T>& b) noexcept {
-    return vec3<T>(a).ew_mul(b);
-}
-
-template<typename T>
-inline constexpr vec3<T> ew_div(const vec3<T>& a, const vec3<T>& b) noexcept {
-    return vec3<T>(a).ew_div(b);
+inline constexpr vec3<T> operator/(const vec3<T>& a, const vec3<T>& b) noexcept {
+    return vec3<T>(a) /= b;
 }
 
 template<typename T>
@@ -213,18 +211,41 @@ using vec3f64 = vec3<f64>;
 
 // vector n should be normalized
 template<class RandGen>
-inline vec3f32 sample_hemisphere(const vec3f32& n, RandGen& rng) {
+inline vec3f32 sample_uniform_hemisphere(const vec3f32& n, RandGen& rng) {
     std::uniform_real_distribution<f32> r{};
 
-    auto phi = 2.0f * F32_PI * r(rng);
-    auto sin_theta_sqrt = r(rng);
-    auto sin_theta = std::sqrt(sin_theta_sqrt);
+    auto r1 = r(rng);
+    auto r2 = r(rng);
+    auto phi = 2.0f * F32_PI * r1;
+    auto sin_theta = std::sqrt(1.0f - r2 * r2);
+    auto x = sin_theta * std::cos(phi);
+    auto y = sin_theta * std::sin(phi);
+    auto z = r2;
 
     vec3f32 axis = std::abs(n.x) > 0.001f ? vec3f32(0.0f, 1.0f, 0.0f) : vec3f32(1.0f, 0.0f, 0.0f);
     auto t = normalize(cross(axis, n));
     auto s = cross(n, t);
 
-    return normalize(s * std::cos(phi) * sin_theta + t * std::sin(phi) * sin_theta + n * std::sqrt(1.0f - sin_theta_sqrt));
+    return normalize(s * x + t * y + n * z);
+}
+
+// vector n should be normalized
+template<class RandGen>
+inline vec3f32 sample_cosine_hemisphere(const vec3f32& n, RandGen& rng) {
+    std::uniform_real_distribution<f32> r{};
+
+    auto r1 = r(rng);
+    auto r2 = r(rng);
+    auto phi = 2.0f * F32_PI * r1;
+    auto x = std::cos(phi) * std::sqrt(r2);
+    auto y = std::sin(phi) * std::sqrt(r2);
+    auto z = std::sqrt(1.0f - r2);
+
+    vec3f32 axis = std::abs(n.x) > 0.001f ? vec3f32(0.0f, 1.0f, 0.0f) : vec3f32(1.0f, 0.0f, 0.0f);
+    auto t = normalize(cross(axis, n));
+    auto s = cross(n, t);
+
+    return normalize(s * x + t * y + n * z);
 }
 
 }

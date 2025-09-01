@@ -157,7 +157,7 @@ vec3f32 sample_ggx(const vec3f32& n, f32 alpha, RandGen& rng) {
     auto r2 = rand_val(rng);
 
     auto phi = 2.0f * F32_PI * r1;
-    auto cos_theta = std::sqrt((1.0f - r2) / (1.0f + (alpha2 - 1.0f) * r2));
+    auto cos_theta = std::sqrt((1.0f - r2) / (1.0001f + (alpha2 - 1.0f) * r2));
     auto sin_theta = std::sqrt(1.0f - cos_theta * cos_theta);
     auto x = sin_theta * std::cos(phi);
     auto y = sin_theta * std::sin(phi);

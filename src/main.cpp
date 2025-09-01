@@ -31,7 +31,7 @@ constexpr lumina::u32 IMAGE_HEIGHT = (IMAGE_WIDTH / ASPECT_RATIO < 1) ? 1 : IMAG
 constexpr lumina::u32 SAMPLES      = 1;
 constexpr lumina::u32 MAX_RECURSE  = 4;
 #else
-constexpr lumina::u32 SAMPLES      = 128;
+constexpr lumina::u32 SAMPLES      = 1024;
 constexpr lumina::u32 MAX_RECURSE  = 32;
 #endif
 
@@ -51,6 +51,9 @@ lumina::vec3f32 trace_ray(const lumina::ray& ray, const lumina::bvh& bvh, const 
             lumina::triangle triangle(vertices[indices[index_idx].x], vertices[indices[index_idx].y], vertices[indices[index_idx].z]);
 
             current_att *= mat.albedo + mat.emission;
+            if(lumina::dot(mat.emission, mat.emission) > 0.0f) {
+                return current_att;
+            }
 
             auto n = triangle.normal(ray, t);
             auto next_origin = current_ray[t] + n * 0.0001f;
@@ -59,9 +62,11 @@ lumina::vec3f32 trace_ray(const lumina::ray& ray, const lumina::bvh& bvh, const 
             current_ray = lumina::ray(next_origin, next_direction);
         }
         else {   
-            auto t = 0.5f * (ray.direction.y + 1.0f);
-            auto c = (1.0f - t) * lumina::vec3f32(1.0f) + t * lumina::vec3f32(0.5f, 0.7f, 1.0f);
-            return current_att * c;
+            // auto t = 0.5f * (ray.direction.y + 1.0f);
+            // auto c = (1.0f - t) * lumina::vec3f32(1.0f) + t * lumina::vec3f32(0.5f, 0.7f, 1.0f);
+            auto c = lumina::vec3f32(0.0f);
+            // return current_att * c;
+            return c;
         }
     }
 
@@ -113,11 +118,11 @@ int main(int argc, const char* argv[]) {
     std::vector<lumina::material> materials(mesh_groups.size());
 
     std::unordered_map<std::string, lumina::material> mat_config{};
-    mat_config["BackGroundMat"] = lumina::material{.albedo = {0.8f}, .emission = {0.0f}, .roughness = 0.05f, .refractive_index = 0.0f};
+    mat_config["BackGroundMat"] = lumina::material{.albedo = {0.8f}, .emission = {0.0f}, .roughness = 0.5f, .refractive_index = 0.0f};
     mat_config["InnerMat"] = lumina::material{.albedo = {0.8f, 0.8f, 0.0f}, .emission = {0.0f}, .roughness = 1.0f, .refractive_index = 0.0f};
-    mat_config["LTELogo"] = lumina::material{.albedo = {0.0f, 0.8f, 0.0f}, .emission = {0.8f}, .roughness = 1.0f, .refractive_index = 0.0f};
-    mat_config["Material"] = lumina::material{.albedo = {1.0f}, .emission = {0.0f}, .roughness = 1.0f, .refractive_index = 0.0f};
-    mat_config["OuterMat"] = lumina::material{.albedo = {0.8f, 0.0f, 0.0f}, .emission = {0.0f}, .roughness = 0.5f, .refractive_index = 0.0f};
+    mat_config["LTELogo"] = lumina::material{.albedo = {0.0f, 0.8f, 0.0f}, .emission = {0.0f, 0.8f, 0.0f}, .roughness = 1.0f, .refractive_index = 0.0f};
+    mat_config["Material"] = lumina::material{.albedo = {1.0f}, .emission = {1.0f}, .roughness = 1.0f, .refractive_index = 0.0f};
+    mat_config["OuterMat"] = lumina::material{.albedo = {0.8f, 0.0f, 0.0f}, .emission = {0.0f}, .roughness = 0.0f, .refractive_index = 0.0f};
 
     {
         lumina::u32 m = 0;
@@ -157,7 +162,7 @@ int main(int argc, const char* argv[]) {
                         for(lumina::u32 s = 0; s < SAMPLES; ++s) {
                             auto ray = cam.generate_ray(x, y, rng);
 
-                            pixel += trace_ray(ray, bvh, vertices, indices, mat_indices, materials, rng);
+                            pixel += lumina::min(trace_ray(ray, bvh, vertices, indices, mat_indices, materials, rng), lumina::vec3f32(1.0f));
                         }
                         pixel /= lumina::f32(SAMPLES);
                         pixels[y * IMAGE_WIDTH + x] = pixel;

@@ -58,16 +58,12 @@ lumina::vec3f32 trace_ray(const lumina::ray& ray, const lumina::bvh& bvh, const 
 
             auto n = triangle.normal(ray, t);
             auto next_origin = current_ray[t] + n * 0.0001f;
-            // auto next_direction = lumina::sample_cosine_hemisphere(n, rng);
             auto [next_direction, bsdf_value, pdf_value] = lumina::sample_bsdf(current_ray.direction, n, mat.roughness, 1.0f, mat.refractive_index, rng);
             current_ray = lumina::ray(next_origin, next_direction);
         }
         else {   
-            // auto t = 0.5f * (ray.direction.y + 1.0f);
-            // auto c = (1.0f - t) * lumina::vec3f32(1.0f) + t * lumina::vec3f32(0.5f, 0.7f, 1.0f);
-            auto c = lumina::vec3f32(0.0f);
-            // return current_att * c;
-            return c;
+            auto background = lumina::vec3f32(0.0f);
+            return background;
         }
     }
 
@@ -97,7 +93,7 @@ int main(int argc, const char* argv[]) {
     lumina::xoshiro256pp rng0(seed());
 
     lumina::camera cam(
-        {0.0f, 1.0f, -1.0f},
+        {1.0f, 1.0f, -1.0f},
         {0.0f, 0.7f, -0.5f},
         {0.0f, 1.0f, 0.0f},
         90.0f, IMAGE_WIDTH, IMAGE_HEIGHT
@@ -108,7 +104,7 @@ int main(int argc, const char* argv[]) {
     std::vector<lumina::material> materials(mesh_groups.size());
 
     std::unordered_map<std::string, lumina::material> mat_config{};
-    mat_config["BackGroundMat"] = lumina::material{.albedo = {0.8f}, .emission = {0.0f}, .roughness = 0.5f, .refractive_index = 0.0f};
+    mat_config["BackGroundMat"] = lumina::material{.albedo = {0.8f}, .emission = {0.0f}, .roughness = 0.2f, .refractive_index = 0.0f};
     mat_config["InnerMat"] = lumina::material{.albedo = {0.8f, 0.8f, 0.0f}, .emission = {0.0f}, .roughness = 1.0f, .refractive_index = 0.0f};
     mat_config["LTELogo"] = lumina::material{.albedo = {0.0f, 0.8f, 0.0f}, .emission = {0.0f, 0.8f, 0.0f}, .roughness = 1.0f, .refractive_index = 0.0f};
     mat_config["Material"] = lumina::material{.albedo = {1.0f}, .emission = {1.0f}, .roughness = 1.0f, .refractive_index = 0.0f};

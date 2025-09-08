@@ -27,6 +27,25 @@ struct triangle {
             return n;
         }
     }
+
+    constexpr vec3f32 barycentric(const vec3f32 p) const noexcept {
+        auto v0 = p1 - p0;
+        auto v1 = p2 - p0;
+        auto v2 = p - p0;
+        auto d00 = dot(v0, v0);
+        auto d01 = dot(v0, v1);
+        auto d11 = dot(v1, v1);
+        auto d20 = dot(v2, v0);
+        auto d21 = dot(v2, v1);
+
+        auto denominator = d00 * d11 - d01 * d01;
+
+        auto v = (d11 * d20 - d01 * d21) / denominator;
+        auto w = (d00 * d21 - d01 * d20) / denominator;
+        auto u = 1.0f - v - w;
+
+        return { u, v, w };
+    }
 };
 
 inline std::ostream& operator<<(std::ostream& os, const triangle& t) {

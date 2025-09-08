@@ -89,6 +89,10 @@ void save_ppm(const std::filesystem::path& path, const std::vector<lumina::vec3f
 int main(int argc, const char* argv[]) {
     std::cout << std::format("build type: {}", BUILD_TYPE) << std::endl;
 
+    lumina::triangle t({0.0f}, {1.0f}, {0.0f, 0.0f, 1.0f});
+
+    std::cout << t.barycentric({0.0f}) << std::endl;
+
     std::random_device seed{};
     lumina::xoshiro256pp rng0(seed());
 
@@ -99,8 +103,12 @@ int main(int argc, const char* argv[]) {
         90.0f, IMAGE_WIDTH, IMAGE_HEIGHT
     );
 
-    auto [vertices, indices, mesh_groups] = lumina::load_obj("../asset/mori_knob/mori_knob.obj");
-    std::vector<lumina::u32> mat_indices(indices.size());
+    auto [vertices, texcoords, normals, vertex_indices, texcoord_indices, normal_indices, mesh_groups] = lumina::load_obj("../asset/mori_knob/mori_knob.obj");
+    std::cout << std::format("# of vertices = {}, # of texcoords = {}, # of normals = {}", vertices.size(), texcoords.size(), normals.size()) << std::endl;
+    std::cout << std::format("# of vertex indices = {}, # of texcoord indices = {}, # of normal indices = {}", vertex_indices.size(), texcoord_indices.size(), normal_indices.size()) << std::endl;
+    return 0;
+
+    std::vector<lumina::u32> mat_indices(vertex_indices.size());
     std::vector<lumina::material> materials(mesh_groups.size());
 
     std::unordered_map<std::string, lumina::material> mat_config{};
@@ -126,7 +134,7 @@ int main(int argc, const char* argv[]) {
 
     std::cout << std::format("possible # of threads = {}", std::thread::hardware_concurrency()) << std::endl;
 
-    lumina::bvh bvh(vertices, indices);
+    lumina::bvh bvh(vertices, vertex_indices);
 
     auto time_start = std::chrono::steady_clock::now();
 
@@ -166,7 +174,7 @@ int main(int argc, const char* argv[]) {
                         for(lumina::u32 s = 0; s < SAMPLES; ++s) {
                             auto ray = cam.generate_ray(x, y, rng);
 
-                            pixel += lumina::min(trace_ray(ray, bvh, vertices, indices, mat_indices, materials, rng), lumina::vec3f32(1.0f));
+                            pixel += lumina::min(trace_ray(ray, bvh, vertices, vertex_indices, mat_indices, materials, rng), lumina::vec3f32(1.0f));
                         }
                         pixel /= lumina::f32(SAMPLES);
                         pixels[y * IMAGE_WIDTH + x] = pixel;

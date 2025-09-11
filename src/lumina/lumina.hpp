@@ -8,6 +8,7 @@
 #include "internal/kdtree.hpp"
 #include "internal/material.hpp"
 #include "internal/matrix.hpp"
+#include "internal/mesh.hpp"
 #include "internal/obj.hpp"
 #include "internal/ray.hpp"
 #include "internal/ref_idx.hpp"

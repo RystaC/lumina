@@ -61,7 +61,7 @@ inline std::tuple<u32, std::optional<u32>, std::optional<u32>> read_index(std::s
     }
 
     auto t_str = str.substr(0, str.find_first_of('/'));
-    str.remove_prefix(str.find_first_of('/'));
+    str.remove_prefix(str.find_first_of('/') + 1);
 
     // v//n
     if(t_str.empty()) {
@@ -97,12 +97,9 @@ std::tuple<
     std::vector<vec2f32>,
     std::vector<vec3f32>,
     std::vector<vec3u32>,
-    std::vector<vec3u32>,
-    std::vector<vec3u32>,
-    std::unordered_map<
-        std::string,
-        std::pair<u32, u32>
-    >
+    std::vector<std::optional<vec3u32>>,
+    std::vector<std::optional<vec3u32>>,
+    std::unordered_map<std::string, u32>
 > load_obj(const char* path) {
     std::FILE* fp = std::fopen(path, "r");
     if(!fp) {
@@ -114,11 +111,11 @@ std::tuple<
     std::vector<vec2f32> texcoords{};
     std::vector<vec3f32> normals{};
     std::vector<vec3u32> vertex_indices{};
-    std::vector<vec3u32> texcoord_indices{};
-    std::vector<vec3u32> normal_indices{};
+    std::vector<std::optional<vec3u32>> texcoord_indices{};
+    std::vector<std::optional<vec3u32>> normal_indices{};
 
-    // (start indices index, end indices index + 1)
-    std::unordered_map<std::string, std::pair<u32, u32>> mesh_groups{};
+    // group name -> polygon count
+    std::unordered_map<std::string, u32> mesh_groups{};
 
     // maximum line length of .obj file
     constexpr u32 BUF_SIZE = 256;
@@ -126,6 +123,7 @@ std::tuple<
     u32 line{};
 
     std::string current_group{};
+    u32 current_count{};
 
     while(!std::feof(fp)) {
         buf.fill('\0');
@@ -233,10 +231,16 @@ std::tuple<
 
             vertex_indices.push_back({v0, v1, v2});
             if(t0 && t1 && t2) {
-                texcoord_indices.push_back({*t0, *t1, *t2});
+                texcoord_indices.push_back(vec3u32(*t0, *t1, *t2));
+            }
+            else {
+                texcoord_indices.push_back(std::nullopt);
             }
             if(n0 && n1 && n2) {
-                normal_indices.push_back({*n0, *n1, *n2});
+                normal_indices.push_back(vec3u32(*n0, *n1, *n2));
+            }
+            else {
+                normal_indices.push_back(std::nullopt);
             }
 
             // face has 4 indices
@@ -246,10 +250,16 @@ std::tuple<
 
                 vertex_indices.push_back({v3, v0, v2});
                 if(t3 && t0 && t2) {
-                    texcoord_indices.push_back({*t3, *t0, *t2});
+                    texcoord_indices.push_back(vec3u32(*t3, *t0, *t2));
+                }
+                else {
+                    texcoord_indices.push_back(std::nullopt);
                 }
                 if(n3 && n0 && n2) {
-                    normal_indices.push_back({*n3, *n0, *n2});
+                    normal_indices.push_back(vec3u32(*n3, *n0, *n2));
+                }
+                else {
+                    normal_indices.push_back(std::nullopt);
                 }
             }
         }
@@ -262,13 +272,13 @@ std::tuple<
 
             if(current_group.empty()) {
                 current_group = group_name;
-                mesh_groups[current_group] = std::make_pair(0, 0);
+                current_count = 0;
             }
             else {
-                mesh_groups[current_group].second = static_cast<u32>(vertex_indices.size());
+                mesh_groups[current_group] = static_cast<u32>(vertex_indices.size()) - current_count;
 
                 current_group = group_name;
-                mesh_groups[current_group] = std::make_pair(static_cast<u32>(vertex_indices.size()), 0);
+                current_count = static_cast<u32>(vertex_indices.size());
             }
         }
         // other token -> skip
@@ -277,7 +287,13 @@ std::tuple<
         }
     }
 
-    mesh_groups[current_group].second = static_cast<u32>(vertex_indices.size());
+    // .obj file has no groups -> register group with all polygons
+    if(mesh_groups.empty()) {
+        mesh_groups[""] = static_cast<u32>(vertex_indices.size());
+    }
+    else {
+        mesh_groups[current_group] = static_cast<u32>(vertex_indices.size()) - current_count;
+    }
 
     std::fclose(fp);
 

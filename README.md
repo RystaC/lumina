@@ -37,22 +37,22 @@ Releaseビルドしたアプリケーションを実行するとレイトレー�
 ![](./test.png)
 
 
-128ppx, 最大再帰深度32
+128spp, 最大再帰深度32
 
 
-![](./test_1024ppx_17min.png)
+![](./test_1024spp_17min.png)
 
 
-1024ppx, 最大再帰深度32, 生成時間17分, マテリアル情報を設定
+1024spp, 最大再帰深度32, 生成時間17分, マテリアル情報を設定
 
 
-![](./test_1024ppx_only_light.png)
+![](./test_1024spp_only_light.png)
 
 
-1024ppx, 最大再帰深度32, 光源メッシュのみでライティング
+1024spp, 最大再帰深度32, 光源メッシュのみでライティング
 
 
-![](./test_1024ppx_another_angle.png)
+![](./test_1024spp_another_angle.png)
 
 
 別視点
@@ -62,6 +62,12 @@ Releaseビルドしたアプリケーションを実行するとレイトレー�
 
 
 法線補間を使用
+
+
+![](./test_4096spp_rr.png)
+
+
+4096spp, ロシアンルーレットを使用
 
 
 # Features

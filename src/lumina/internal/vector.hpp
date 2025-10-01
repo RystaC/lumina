@@ -365,45 +365,6 @@ using vec3u64 = vec3<u64>;
 using vec3f32 = vec3<f32>;
 using vec3f64 = vec3<f64>;
 
-// vector n should be normalized
-template<class RandGen>
-inline vec3f32 sample_uniform_hemisphere(const vec3f32& n, RandGen& rng) {
-    std::uniform_real_distribution<f32> r{};
-
-    auto r1 = r(rng);
-    auto r2 = r(rng);
-    auto phi = 2.0f * F32_PI * r1;
-    auto sin_theta = std::sqrt(1.0f - r2 * r2);
-    auto x = sin_theta * std::cos(phi);
-    auto y = sin_theta * std::sin(phi);
-    auto z = r2;
-
-    vec3f32 axis = std::abs(n.x) > 0.001f ? vec3f32(0.0f, 1.0f, 0.0f) : vec3f32(1.0f, 0.0f, 0.0f);
-    auto t = normalize(cross(axis, n));
-    auto s = cross(n, t);
-
-    return normalize(s * x + t * y + n * z);
-}
-
-// vector n should be normalized
-template<class RandGen>
-inline vec3f32 sample_cosine_hemisphere(const vec3f32& n, RandGen& rng) {
-    std::uniform_real_distribution<f32> r{};
-
-    auto r1 = r(rng);
-    auto r2 = r(rng);
-    auto phi = 2.0f * F32_PI * r1;
-    auto x = std::cos(phi) * std::sqrt(r2);
-    auto y = std::sin(phi) * std::sqrt(r2);
-    auto z = std::sqrt(1.0f - r2);
-
-    vec3f32 axis = std::abs(n.x) > 0.001f ? vec3f32(0.0f, 1.0f, 0.0f) : vec3f32(1.0f, 0.0f, 0.0f);
-    auto t = normalize(cross(axis, n));
-    auto s = cross(n, t);
-
-    return normalize(s * x + t * y + n * z);
-}
-
 // 4D vector class
 template<typename T>
 union vec4 {

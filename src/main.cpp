@@ -29,46 +29,65 @@ constexpr lumina::f32 ASPECT_RATIO = 16.0f / 9.0f;
 constexpr lumina::u32 IMAGE_WIDTH  = 512;
 constexpr lumina::u32 IMAGE_HEIGHT = (IMAGE_WIDTH / ASPECT_RATIO < 1) ? 1 : IMAGE_WIDTH / ASPECT_RATIO;
 #if defined(DEBUG)
-constexpr lumina::u32 SAMPLES      = 1;
-constexpr lumina::u32 MAX_RECURSE  = 4;
+constexpr lumina::u32 SAMPLES  = 1;
+constexpr lumina::f32 RR_DECAY = 0.5f;
 #else
-constexpr lumina::u32 SAMPLES      = 1024;
-constexpr lumina::u32 MAX_RECURSE  = 32;
+constexpr lumina::u32 SAMPLES  = 2048;
+constexpr lumina::f32 RR_DECAY = 0.9f;
 #endif
 
+// from: https://rayspace.xyz/CG/contents/path_tracing_implementation/
+// with russian roulette
 template<class RandGen>
-lumina::vec3f32 trace_ray(const lumina::ray& ray, const lumina::bvh& bvh, const lumina::mesh& mesh, RandGen& rng) {
-    lumina::ray current_ray = ray;
-    lumina::vec3f32 current_att = lumina::vec3f32(1.0f);
+lumina::vec3f32 trace_ray(const lumina::ray& r, const lumina::bvh& bvh, const lumina::mesh& mesh, RandGen& rng) {
+    constexpr lumina::f32 eps = 0.0001f;
+    std::uniform_real_distribution<lumina::f32> xi{};
 
-    for(auto i = 0; i < MAX_RECURSE; ++i) {
-        lumina::f32 t_max = lumina::F32_MAX;
-        auto test_result = bvh.trace(mesh.vertices, mesh.vertex_indices, current_ray, lumina::F32_MAX);
+    lumina::vec3f32 i_j{};
+    lumina::vec3f32 alpha = lumina::vec3f32(1.0f);
 
-        if(test_result) {
-            auto index_index = test_result->first;
-            const auto& material = mesh.material(index_index);
-            auto t = test_result->second;
+    lumina::f32 t_max = lumina::F32_MAX;
+    lumina::f32 p_rr = 1.0f;
 
-            current_att *= material.albedo + material.emission;
-            if(lumina::dot(material.emission, material.emission) > 0.0f) {
-                return current_att;
-            }
+    lumina::vec3f32 background = lumina::vec3f32(0.2f);
 
-            auto n = mesh.normal(ray[t], index_index);
-            n = dot(ray.direction, n) > 0.0f ? -n : n;
+    auto ray = r;
 
-            auto next_origin = current_ray[t] + n * 0.0001f;
-            auto [next_direction, bsdf_value, pdf_value] = lumina::sample_bsdf(current_ray.direction, n, material.roughness, 1.0f, material.refractive_index, rng);
-            current_ray = lumina::ray(next_origin, next_direction);
+    while(true) {
+        auto test_result = bvh.trace(mesh.vertices, mesh.vertex_indices, ray, t_max);
+
+        if(!test_result) {
+            i_j += alpha * background;
+            break;
         }
-        else {   
-            auto background = lumina::vec3f32(0.0f);
-            return background;
+
+        auto [index_index, t] = *test_result;
+        const auto& material = mesh.material(index_index);
+
+        auto x = ray[t];
+        auto n = mesh.normal(ray[t], index_index);
+        n = dot(ray.direction, n) > 0.0f ? -n : n;
+        auto omega_o = -ray.direction;
+
+        auto [m, omega_i, pdf_val] = lumina::sample_ggx(omega_o, n, material.roughness, rng);
+
+        if(material.emission.norm() != 0.0f) {
+            i_j += alpha * material.emission;
         }
+
+        alpha *= material.albedo;
+
+        p_rr *= RR_DECAY;
+        if(xi(rng) >= p_rr) {
+            break;
+        }
+
+        ray = lumina::ray(x + n * eps, omega_i);
+
+        alpha *= 1.0f / p_rr;
     }
 
-    return lumina::vec3f32(0.0f);
+    return i_j;
 }
 
 void save_ppm(const std::filesystem::path& path, const std::vector<lumina::vec3f32>& pixels) {
@@ -103,10 +122,10 @@ int main(int argc, const char* argv[]) {
     auto [vertices, texcoords, normals, vertex_indices, texcoord_indices, normal_indices, mesh_groups] = lumina::load_obj("../asset/mori_knob/mori_knob.obj");
     lumina::mesh mesh(std::move(vertices), std::move(texcoords), std::move(normals), std::move(vertex_indices), std::move(texcoord_indices), std::move(normal_indices), std::move(mesh_groups));
     mesh.add_material("BackGroundMat", lumina::material{.albedo = {0.8f}, .emission = {0.0f}, .roughness = 0.2f, .refractive_index = 0.0f});
-    mesh.add_material("InnerMat", lumina::material{.albedo = {0.8f, 0.8f, 0.0f}, .emission = {0.0f}, .roughness = 1.0f, .refractive_index = 0.0f});
+    mesh.add_material("InnerMat", lumina::material{.albedo = {0.8f, 0.0f, 0.0f}, .emission = {0.0f}, .roughness = 0.0f, .refractive_index = 0.0f});
     mesh.add_material("LTELogo", lumina::material{.albedo = {0.0f, 0.8f, 0.0f}, .emission = {0.0f, 0.8f, 0.0f}, .roughness = 1.0f, .refractive_index = 0.0f});
     mesh.add_material("Material", lumina::material{.albedo = {1.0f}, .emission = {1.0f}, .roughness = 1.0f, .refractive_index = 0.0f});
-    mesh.add_material("OuterMat", lumina::material{.albedo = {0.8f, 0.0f, 0.0f}, .emission = {0.0f}, .roughness = 0.0f, .refractive_index = 0.0f});
+    mesh.add_material("OuterMat", lumina::material{.albedo = {1.0f}, .emission = {0.0f}, .roughness = 0.0f, .refractive_index = 0.0f});
     mesh.statistics();
 
     std::cout << std::format("possible # of threads = {}", std::thread::hardware_concurrency()) << std::endl;
